@@ -2,37 +2,79 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Newsletter Signup</title>
   <style>
-    body { font-family: sans-serif; margin: 0; padding: 1rem; }
-    input, button { padding: .5rem; font-size: 1rem; }
-    #status { margin-top: .75rem; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 1rem; background: transparent; }
+    .signup-card { max-width: 380px; }
+    h3 { font-size: 1.1rem; margin-bottom: 0.5rem; color: #333; }
+    p { font-size: 0.85rem; color: #666; margin-bottom: 1rem; }
+    .form-row { display: flex; gap: 0.5rem; }
+    input[type="email"] {
+      flex: 1; padding: 0.6rem 0.75rem; border: 1px solid #ccc; border-radius: 6px;
+      font-size: 0.95rem; outline: none; transition: border-color 0.2s;
+    }
+    input[type="email"]:focus { border-color: #1095c1; }
+    button {
+      padding: 0.6rem 1.25rem; background: #1095c1; color: white; border: none;
+      border-radius: 6px; font-size: 0.95rem; font-weight: 600; cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #0d7fa3; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    #status {
+      margin-top: 0.75rem; font-size: 0.85rem; min-height: 1.2em;
+      transition: opacity 0.3s;
+    }
+    .success { color: #155724; }
+    .error { color: #721c24; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+    #status.show { animation: fadeIn 0.3s ease; }
   </style>
 </head>
 <body>
-  <form id="subscribe-form">
-    <label>
-      Email
-      <input type="email" name="email" required>
-    </label>
-    <button type="submit">Subscribe</button>
-  </form>
-  <div id="status"></div>
+  <div class="signup-card">
+    <h3>📨 Stay in the loop</h3>
+    <p>Subscribe to get the latest updates delivered to your inbox.</p>
+    <form id="subscribe-form">
+      <div class="form-row">
+        <input type="email" name="email" placeholder="your@email.com" required aria-label="Email address">
+        <button type="submit" id="submit-btn">Subscribe</button>
+      </div>
+    </form>
+    <div id="status"></div>
+  </div>
 
   <script>
     const form = document.getElementById('subscribe-form');
     const statusEl = document.getElementById('status');
+    const submitBtn = document.getElementById('submit-btn');
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
-      const formData = new FormData(form);
-      const response = await fetch('/subscribe', {
-        method: 'POST',
-        body: formData
-      });
-      const payload = await response.json();
-      statusEl.style.color = response.ok ? 'green' : 'red';
-      statusEl.textContent = payload.message || payload.detail || 'Unknown response';
+      submitBtn.disabled = true;
+      submitBtn.textContent = '...';
+      statusEl.className = '';
+      statusEl.textContent = '';
+
+      try {
+        const formData = new FormData(form);
+        const response = await fetch('/subscribe', {
+          method: 'POST',
+          body: formData
+        });
+        const payload = await response.json();
+        statusEl.className = (response.ok ? 'success' : 'error') + ' show';
+        statusEl.textContent = payload.message || payload.detail || 'Something went wrong';
+        if (response.ok) form.reset();
+      } catch {
+        statusEl.className = 'error show';
+        statusEl.textContent = 'Network error. Please try again.';
+      }
+
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Subscribe';
     });
   </script>
 </body>

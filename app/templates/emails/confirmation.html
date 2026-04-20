@@ -1,8 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
-  <body>
-    <p>Thanks for subscribing to our newsletter.</p>
-    <p>Please confirm your subscription (Double Opt-In):</p>
-    <p><a href="{{ confirm_url }}">Confirm subscription</a></p>
-  </body>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0; padding:0; background-color:#f4f4f5; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;">
+    <tr>
+      <td align="center" style="padding:2rem 1rem;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px; background:#ffffff; border-radius:8px; overflow:hidden;">
+          <tr>
+            <td style="background:#1095c1; padding:1.5rem 2rem; text-align:center;">
+              <h1 style="margin:0; color:#ffffff; font-size:1.25rem;">{{ brand_name }}</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:2rem;">
+              <p style="margin:0 0 1rem; font-size:1rem; line-height:1.6; color:#333;">
+                Thanks for subscribing to our newsletter!
+              </p>
+              <p style="margin:0 0 1.5rem; font-size:1rem; line-height:1.6; color:#333;">
+                Please confirm your subscription by clicking the button below (Double Opt-In):
+              </p>
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+                <tr>
+                  <td style="border-radius:6px; background:#1095c1;">
+                    <a href="{{ confirm_url }}" style="display:inline-block; padding:0.75rem 2rem; color:#ffffff; text-decoration:none; font-weight:600; font-size:1rem;">
+                      Confirm Subscription
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:1.5rem 0 0; font-size:0.85rem; color:#888; line-height:1.5;">
+                If you didn't subscribe, you can safely ignore this email.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:1rem 2rem; background:#f9f9f9; text-align:center; font-size:0.8rem; color:#999;">
+              <p style="margin:0;">{{ brand_name }} — Self-hosted Newsletter</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
 </html>

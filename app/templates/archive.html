@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Newsletter Archive — {{ brand_name }}{% endblock %}
+{% block content %}
+<h2>📬 Newsletter Archive</h2>
+<p>Browse our past newsletters below.</p>
+
+{% if newsletters %}
+<div style="display: grid; gap: 1rem;">
+  {% for nl in newsletters %}
+  <article>
+    <header>
+      <h3 style="margin-bottom: 0.25rem;">{{ nl.subject }}</h3>
+      <small style="color: var(--pico-muted-color);">{{ nl.sent_at[:10] if nl.sent_at else nl.created_at[:10] }} · {{ nl.recipient_count }} recipients</small>
+    </header>
+    <p>{{ nl.body_text[:200] if nl.body_text else '' }}{% if nl.body_text and nl.body_text|length > 200 %}...{% endif %}</p>
+    <footer>
+      <a href="/archive/{{ nl.id }}" role="button" class="outline">Read more →</a>
+    </footer>
+  </article>
+  {% endfor %}
+</div>
+
+{% if total_pages > 1 %}
+<nav style="display:flex; gap:0.5rem; justify-content:center; margin-top:1.5rem;">
+  {% if page > 1 %}<a href="/archive?page={{ page - 1 }}" role="button" class="outline">← Prev</a>{% endif %}
+  <span style="padding:0.5rem;">Page {{ page }} of {{ total_pages }}</span>
+  {% if page < total_pages %}<a href="/archive?page={{ page + 1 }}" role="button" class="outline">Next →</a>{% endif %}
+</nav>
+{% endif %}
+
+{% else %}
+<p>No newsletters have been published yet. Check back soon!</p>
+{% endif %}
+{% endblock %}

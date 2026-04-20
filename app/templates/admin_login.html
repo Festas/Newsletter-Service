@@ -1,16 +1,18 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Newsletter Admin Login</title>
-</head>
-<body>
-  <h1>Newsletter Admin</h1>
-  {% if error %}<p style="color: red;">{{ error }}</p>{% endif %}
+{% extends "base.html" %}
+{% block title %}Login — {{ brand_name }} Admin{% endblock %}
+
+{% block content %}
+<article style="max-width: 420px; margin: 4rem auto;">
+  <header>
+    <h2>🔐 {{ brand_name }} Admin</h2>
+  </header>
+  {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
   <form method="post" action="/admin/login">
-    <label>Username <input type="text" name="username" required></label><br>
-    <label>Password <input type="password" name="password" required></label><br>
+    <label for="username">Username</label>
+    <input type="text" id="username" name="username" required autocomplete="username">
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" required autocomplete="current-password">
     <button type="submit">Login</button>
   </form>
-</body>
-</html>
+</article>
+{% endblock %}
