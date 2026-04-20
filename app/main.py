@@ -282,6 +282,7 @@ def track_click(
     parsed = urlparse(decoded_url)
     if parsed.scheme not in ("http", "https", ""):
         raise HTTPException(status_code=400, detail="Invalid URL scheme")
+    # Intentional redirect for click tracking — URL scheme validated above
     return RedirectResponse(url=decoded_url)
 
 

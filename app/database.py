@@ -220,6 +220,8 @@ def list_subscribers(
             conditions.append("(',' || tags || ',') LIKE ?")
             params.append(f"%,{tag},%")
 
+        # Safety: `where` clause is built from hardcoded conditions above,
+        # not from user input. All user values are passed as `params`.
         where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
         count_row = conn.execute(
             f"SELECT COUNT(*) as cnt FROM subscribers {where}", params
