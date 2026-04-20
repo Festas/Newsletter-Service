@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}{{ newsletter.subject }} — {{ brand_name }}{% endblock %}
+{% block content %}
+<article style="max-width: 700px; margin: 2rem auto;">
+  <header>
+    <h2>{{ newsletter.subject }}</h2>
+    <small style="color: var(--pico-muted-color);">Published {{ newsletter.sent_at[:10] if newsletter.sent_at else newsletter.created_at[:10] }}</small>
+  </header>
+  <div>
+    {% if newsletter.body_html %}
+      {{ newsletter.body_html | safe }}
+    {% elif newsletter.body_text %}
+      <pre style="white-space: pre-wrap;">{{ newsletter.body_text }}</pre>
+    {% endif %}
+  </div>
+  <footer>
+    <a href="/archive">← Back to Archive</a>
+  </footer>
+</article>
+{% endblock %}

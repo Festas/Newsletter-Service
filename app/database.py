@@ -2,7 +2,7 @@ import logging
 import os
 import secrets
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -11,7 +11,7 @@ DATABASE_PATH = os.getenv("DATABASE_PATH", "newsletter.db")
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def get_connection() -> sqlite3.Connection:
@@ -165,7 +165,7 @@ def confirm_by_token(token: str) -> bool:
         if token_created:
             try:
                 created_dt = datetime.fromisoformat(token_created)
-                age_hours = (datetime.now(timezone.utc) - created_dt).total_seconds() / 3600
+                age_hours = (datetime.now(UTC) - created_dt).total_seconds() / 3600
                 if age_hours > TOKEN_EXPIRY_HOURS:
                     logger.warning("Expired confirmation token for subscriber %s", subscriber["email"])
                     return False

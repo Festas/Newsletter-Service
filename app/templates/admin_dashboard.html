@@ -1,50 +1,419 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Newsletter Admin</title>
-</head>
-<body>
-  <h1>Newsletter Dashboard</h1>
-  <p>Total subscribers: {{ count }}</p>
+{% extends "base.html" %}
+{% block title %}Dashboard — {{ brand_name }} Admin{% endblock %}
 
-  {% if message %}<p style="color: green;">{{ message }}</p>{% endif %}
-  {% if error %}<p style="color: red;">{{ error }}</p>{% endif %}
+{% block head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.css">
+<script src="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  .EasyMDEContainer { margin-bottom: 1rem; }
+  .EasyMDEContainer .CodeMirror { min-height: 250px; }
+</style>
+{% endblock %}
 
-  <h2>Send Newsletter</h2>
-  <form method="post" action="/admin/send">
-    <label>Subject <input type="text" name="subject" required></label><br>
-    <label>Plain text<br><textarea name="body_text" rows="8" cols="60"></textarea></label><br>
-    <label>HTML<br><textarea name="body_html" rows="8" cols="60"></textarea></label><br>
-    <button type="submit">Send Newsletter</button>
+{% block header %}
+<nav>
+  <ul><li><strong class="brand">📨 {{ brand_name }}</strong></li></ul>
+  <ul>
+    <li><a href="/archive">Archive</a></li>
+    <li>
+      <form method="post" action="/admin/logout" style="margin:0">
+        <button type="submit" class="outline secondary action-btn">Logout</button>
+      </form>
+    </li>
+  </ul>
+</nav>
+{% endblock %}
+
+{% block content %}
+{% if message %}<div class="alert alert-success">{{ message }}</div>{% endif %}
+{% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+
+<!-- Stats -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="number">{{ count }}</div>
+    <div class="label">Total Subscribers</div>
+  </div>
+  <div class="stat-card">
+    <div class="number">{{ confirmed_count }}</div>
+    <div class="label">Confirmed</div>
+  </div>
+  <div class="stat-card">
+    <div class="number">{{ unconfirmed_count }}</div>
+    <div class="label">Pending</div>
+  </div>
+  <div class="stat-card">
+    <div class="number">{{ sent_newsletters|length }}</div>
+    <div class="label">Newsletters Sent</div>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+  <a href="/admin?tab=compose" class="{% if tab == 'compose' %}active{% endif %}">✏️ Compose</a>
+  <a href="/admin?tab=drafts" class="{% if tab == 'drafts' %}active{% endif %}">📝 Drafts ({{ draft_newsletters|length }})</a>
+  <a href="/admin?tab=history" class="{% if tab == 'history' %}active{% endif %}">📬 History</a>
+  <a href="/admin?tab=subscribers" class="{% if tab == 'subscribers' %}active{% endif %}">👥 Subscribers</a>
+  <a href="/admin?tab=analytics" class="{% if tab == 'analytics' %}active{% endif %}">📊 Analytics</a>
+  <a href="/admin?tab=settings" class="{% if tab == 'settings' %}active{% endif %}">⚙️ Settings</a>
+</div>
+
+<!-- TAB: Compose -->
+{% if tab == 'compose' %}
+<section>
+  <h3>Compose Newsletter</h3>
+  <form method="post" action="/admin/send" id="send-form">
+    <label for="subject">Subject</label>
+    <input type="text" id="subject" name="subject" required value="{{ draft.subject if draft else '' }}">
+
+    <div class="two-col">
+      <div>
+        <label for="body_text">Content (Markdown)</label>
+        <textarea id="body_text" name="body_text" rows="12">{{ draft.body_text if draft else '' }}</textarea>
+      </div>
+      <div>
+        <label>HTML Preview</label>
+        <div class="preview-pane" id="html-preview"></div>
+      </div>
+    </div>
+
+    <details>
+      <summary>Advanced: Raw HTML body (overrides Markdown)</summary>
+      <textarea id="body_html" name="body_html" rows="8" placeholder="Leave empty to auto-generate from Markdown above">{{ draft.body_html if draft else '' }}</textarea>
+    </details>
+
+    {% if draft %}
+    <input type="hidden" name="draft_id" value="{{ draft.id }}">
+    {% endif %}
+
+    <div style="display:flex; gap:1rem; margin-top:1rem;">
+      <button type="button" id="send-btn" class="primary">🚀 Send Newsletter</button>
+      <button type="button" id="save-draft-btn" class="secondary outline">💾 Save as Draft</button>
+    </div>
   </form>
+</section>
 
-  <form method="post" action="/admin/logout">
-    <button type="submit">Logout</button>
-  </form>
+<!-- Confirmation dialog -->
+<dialog id="confirm-dialog">
+  <article>
+    <header><h3>⚠️ Confirm Send</h3></header>
+    <p>You are about to send this newsletter to <strong>{{ confirmed_count }}</strong> confirmed subscriber(s).</p>
+    <p>Subject: <strong id="confirm-subject"></strong></p>
+    <footer>
+      <button class="secondary" id="cancel-send">Cancel</button>
+      <button class="primary" id="confirm-send">Send Now</button>
+    </footer>
+  </article>
+</dialog>
+{% endif %}
 
-  <h2>Subscribers</h2>
-  <table border="1" cellpadding="6" cellspacing="0">
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Email</th>
-        <th>Confirmed</th>
-        <th>Subscribed At</th>
-        <th>Confirmed At</th>
-      </tr>
-    </thead>
+<!-- TAB: Drafts -->
+{% if tab == 'drafts' %}
+<section>
+  <h3>Saved Drafts</h3>
+  {% if draft_newsletters %}
+  <table>
+    <thead><tr><th>Subject</th><th>Created</th><th>Actions</th></tr></thead>
     <tbody>
-      {% for subscriber in subscribers %}
+      {% for d in draft_newsletters %}
       <tr>
-        <td>{{ subscriber.id }}</td>
-        <td>{{ subscriber.email }}</td>
-        <td>{{ 'Yes' if subscriber.confirmed else 'No' }}</td>
-        <td>{{ subscriber.subscribed_at }}</td>
-        <td>{{ subscriber.confirmed_at or '-' }}</td>
+        <td>{{ d.subject or '(no subject)' }}</td>
+        <td>{{ d.created_at[:16] }}</td>
+        <td>
+          <a href="/admin/draft/{{ d.id }}" role="button" class="outline action-btn">Edit</a>
+          <form method="post" action="/admin/draft/{{ d.id }}/delete" style="display:inline">
+            <button type="submit" class="outline secondary action-btn" onclick="return confirm('Delete this draft?')">Delete</button>
+          </form>
+        </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
-</body>
-</html>
+  {% else %}
+  <p>No drafts yet. Go to Compose and save a draft.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+<!-- TAB: History -->
+{% if tab == 'history' %}
+<section>
+  <h3>Send History</h3>
+  {% if sent_newsletters %}
+  <table>
+    <thead><tr><th>Subject</th><th>Sent</th><th>Recipients</th><th>Opens</th><th>Clicks</th><th></th></tr></thead>
+    <tbody>
+      {% for nl in sent_newsletters %}
+      <tr>
+        <td>{{ nl.subject }}</td>
+        <td>{{ nl.sent_at[:16] if nl.sent_at else '-' }}</td>
+        <td>{{ nl.recipient_count }}</td>
+        <td>{{ nl.analytics.get('open', 0) if nl.analytics else 0 }}</td>
+        <td>{{ nl.analytics.get('click', 0) if nl.analytics else 0 }}</td>
+        <td><a href="/archive/{{ nl.id }}" target="_blank" class="outline action-btn">View</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No newsletters sent yet.</p>
+  {% endif %}
+
+  {% if failures %}
+  <h4 style="margin-top:2rem;">Recent Delivery Failures</h4>
+  <table>
+    <thead><tr><th>Email</th><th>Newsletter</th><th>Error</th><th>Time</th></tr></thead>
+    <tbody>
+      {% for f in failures %}
+      <tr>
+        <td>{{ f.email }}</td>
+        <td>#{{ f.newsletter_id }}</td>
+        <td><small>{{ f.error_message[:80] if f.error_message else '-' }}</small></td>
+        <td>{{ f.created_at[:16] }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+{% endif %}
+
+<!-- TAB: Subscribers -->
+{% if tab == 'subscribers' %}
+<section>
+  <h3>Subscribers</h3>
+
+  <!-- Search & Add -->
+  <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1rem;">
+    <form method="get" action="/admin" style="flex:1; display:flex; gap:0.5rem; margin:0;">
+      <input type="hidden" name="tab" value="subscribers">
+      <input type="search" name="search" placeholder="Search by email..." value="{{ search }}" style="margin:0">
+      <button type="submit" class="outline" style="white-space:nowrap">Search</button>
+    </form>
+    <a href="/admin/subscribers/export" role="button" class="outline secondary">📥 Export CSV</a>
+  </div>
+
+  <!-- Add subscriber -->
+  <details>
+    <summary>Add subscriber manually</summary>
+    <form method="post" action="/admin/subscriber/add" style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:end;">
+      <div><label for="add-email">Email</label><input type="email" id="add-email" name="email" required></div>
+      <div><label for="add-tags">Tags</label><input type="text" id="add-tags" name="tags" placeholder="tag1,tag2"></div>
+      <div><label for="add-notes">Notes</label><input type="text" id="add-notes" name="notes"></div>
+      <button type="submit">Add</button>
+    </form>
+  </details>
+
+  <!-- Import CSV -->
+  <details>
+    <summary>Import subscribers from CSV</summary>
+    <form method="post" action="/admin/subscribers/import" enctype="multipart/form-data" style="display:flex; gap:0.5rem; align-items:end;">
+      <input type="file" name="file" accept=".csv" required>
+      <button type="submit">Import</button>
+    </form>
+    <small>CSV must have an <code>email</code> column. Optional: <code>tags</code>, <code>notes</code>.</small>
+  </details>
+
+  <!-- Subscriber table -->
+  <table>
+    <thead>
+      <tr>
+        <th>Email</th>
+        <th>Status</th>
+        <th>Tags</th>
+        <th>Subscribed</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in subscribers %}
+      <tr>
+        <td>{{ s.email }}</td>
+        <td>
+          {% if s.confirmed %}
+            <span class="badge badge-success">Confirmed</span>
+          {% else %}
+            <span class="badge badge-warning">Pending</span>
+          {% endif %}
+        </td>
+        <td>
+          {% for t in s.tags.split(',') if t.strip() %}
+            <span class="tag">{{ t.strip() }}</span>
+          {% endfor %}
+        </td>
+        <td>{{ s.subscribed_at[:10] }}</td>
+        <td>
+          <form method="post" action="/admin/subscriber/{{ s.id }}/delete" style="display:inline">
+            <button type="submit" class="outline secondary action-btn" onclick="return confirm('Remove this subscriber?')">Remove</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Pagination -->
+  {% if total_pages > 1 %}
+  <nav style="display:flex; gap:0.5rem; justify-content:center; margin-top:1rem;">
+    {% if page > 1 %}
+      <a href="/admin?tab=subscribers&page={{ page - 1 }}&search={{ search }}" role="button" class="outline">← Prev</a>
+    {% endif %}
+    <span style="padding:0.5rem;">Page {{ page }} of {{ total_pages }}</span>
+    {% if page < total_pages %}
+      <a href="/admin?tab=subscribers&page={{ page + 1 }}&search={{ search }}" role="button" class="outline">Next →</a>
+    {% endif %}
+  </nav>
+  {% endif %}
+</section>
+{% endif %}
+
+<!-- TAB: Analytics -->
+{% if tab == 'analytics' %}
+<section>
+  <h3>Subscriber Growth</h3>
+  <canvas id="growth-chart" style="max-height:300px;"></canvas>
+
+  <h3 style="margin-top:2rem;">Newsletter Performance</h3>
+  {% if sent_newsletters %}
+  <table>
+    <thead><tr><th>Subject</th><th>Sent To</th><th>Opens</th><th>Open Rate</th><th>Clicks</th></tr></thead>
+    <tbody>
+      {% for nl in sent_newsletters %}
+      {% set opens = nl.analytics.get('open', 0) if nl.analytics else 0 %}
+      {% set clicks = nl.analytics.get('click', 0) if nl.analytics else 0 %}
+      {% set rate = ((opens / nl.recipient_count * 100)|round(1)) if nl.recipient_count > 0 else 0 %}
+      <tr>
+        <td>{{ nl.subject }}</td>
+        <td>{{ nl.recipient_count }}</td>
+        <td>{{ opens }}</td>
+        <td>{{ rate }}%</td>
+        <td>{{ clicks }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No data yet — send your first newsletter!</p>
+  {% endif %}
+</section>
+{% endif %}
+
+<!-- TAB: Settings -->
+{% if tab == 'settings' %}
+<section>
+  <h3>Webhooks</h3>
+  <p>Get notified when events happen (subscriber.pending, newsletter.sent, etc.).</p>
+  <form method="post" action="/admin/webhooks/add" style="display:flex; gap:0.5rem; align-items:end;">
+    <div style="flex:1"><label for="wh-url">Webhook URL</label><input type="url" id="wh-url" name="url" required></div>
+    <div><label for="wh-events">Events</label><input type="text" id="wh-events" name="events" value="all" placeholder="all"></div>
+    <button type="submit">Add</button>
+  </form>
+
+  <h4 style="margin-top:1rem;">Embed Code</h4>
+  <pre><code>&lt;iframe src="{{ request.base_url }}embed" width="420" height="240" style="border:0;"&gt;&lt;/iframe&gt;</code></pre>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Markdown preview
+const bodyText = document.getElementById('body_text');
+const preview = document.getElementById('html-preview');
+const bodyHtml = document.getElementById('body_html');
+
+if (bodyText && preview) {
+  // Initialize EasyMDE
+  const easyMDE = new EasyMDE({
+    element: bodyText,
+    spellChecker: false,
+    status: false,
+    toolbar: ["bold", "italic", "heading", "|", "unordered-list", "ordered-list", "|", "link", "image", "|", "preview"],
+    previewRender: function(text) {
+      return marked.parse(text);
+    }
+  });
+
+  function updatePreview() {
+    const md = easyMDE.value();
+    const html = marked.parse(md);
+    preview.innerHTML = html;
+    // If user hasn't manually entered HTML, auto-fill
+    if (bodyHtml && !bodyHtml.value.trim()) {
+      bodyHtml.value = html;
+    }
+  }
+
+  easyMDE.codemirror.on('change', updatePreview);
+  updatePreview();
+}
+
+// Send confirmation dialog
+const sendBtn = document.getElementById('send-btn');
+const dialog = document.getElementById('confirm-dialog');
+const confirmSend = document.getElementById('confirm-send');
+const cancelSend = document.getElementById('cancel-send');
+const sendForm = document.getElementById('send-form');
+const confirmSubject = document.getElementById('confirm-subject');
+
+if (sendBtn && dialog) {
+  sendBtn.addEventListener('click', () => {
+    const subjectInput = document.getElementById('subject');
+    if (subjectInput) confirmSubject.textContent = subjectInput.value || '(no subject)';
+    dialog.showModal();
+  });
+
+  cancelSend.addEventListener('click', () => dialog.close());
+
+  confirmSend.addEventListener('click', () => {
+    dialog.close();
+    sendForm.action = '/admin/send';
+    sendForm.submit();
+  });
+}
+
+// Save draft button
+const saveDraftBtn = document.getElementById('save-draft-btn');
+if (saveDraftBtn && sendForm) {
+  saveDraftBtn.addEventListener('click', () => {
+    // Update body_html from markdown preview before submitting
+    if (bodyHtml && preview) {
+      bodyHtml.value = preview.innerHTML;
+    }
+    sendForm.action = '/admin/draft/save';
+    sendForm.submit();
+  });
+}
+
+// Chart.js subscriber growth
+const growthCanvas = document.getElementById('growth-chart');
+if (growthCanvas && typeof Chart !== 'undefined') {
+  const growthData = {{ growth_data | tojson }};
+  let cumulative = 0;
+  const labels = growthData.map(d => d.date);
+  const data = growthData.map(d => { cumulative += d.count; return cumulative; });
+
+  new Chart(growthCanvas, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Total Subscribers',
+        data: data,
+        borderColor: '#1095c1',
+        backgroundColor: 'rgba(16, 149, 193, 0.1)',
+        fill: true,
+        tension: 0.3,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+}
+</script>
+{% endblock %}

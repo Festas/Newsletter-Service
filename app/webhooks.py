@@ -4,8 +4,6 @@ import asyncio
 import logging
 from typing import Any
 
-import aiosmtplib  # reuse for type only; we use httpx-like approach via stdlib
-
 from app.database import list_webhooks
 
 logger = logging.getLogger(__name__)
@@ -24,8 +22,8 @@ async def fire_webhook(event: str, payload: dict[str, Any]) -> None:
 async def _post_webhook(url: str, event: str, payload: dict[str, Any]) -> None:
     """Attempt a POST request to webhook URL using urllib (no extra deps)."""
     import json
-    import urllib.request
     import urllib.error
+    import urllib.request
 
     data = json.dumps({"event": event, "data": payload}).encode()
     req = urllib.request.Request(

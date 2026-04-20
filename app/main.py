@@ -1,3 +1,4 @@
+import contextlib
 import csv
 import io
 import logging
@@ -33,19 +34,15 @@ from app.database import (
     get_newsletter,
     get_newsletter_analytics,
     get_subscriber,
-    get_subscriber_by_email,
     get_subscriber_count_by_date,
     init_db,
     list_confirmed_subscribers,
     list_newsletters,
-    list_scheduled_newsletters,
     list_subscribers,
-    list_webhooks,
     record_analytics_event,
     record_delivery,
     unsubscribe_by_token,
     update_newsletter,
-    update_subscriber_notes,
     update_subscriber_tags,
 )
 from app.email_service import EmailService
@@ -232,15 +229,15 @@ async def subscribe(request: Request, email: str | None = Form(default=None)) ->
 @app.get("/confirm", response_class=HTMLResponse, tags=["Subscribers"])
 def confirm(request: Request, token: str) -> HTMLResponse:
     if confirm_by_token(token):
-        return templates.TemplateResponse("confirm_success.html", {"request": request, "brand_name": BRAND_NAME})
-    return templates.TemplateResponse("confirm_fail.html", {"request": request, "brand_name": BRAND_NAME}, status_code=400)
+        return templates.TemplateResponse(request, "confirm_success.html", {"brand_name": BRAND_NAME})
+    return templates.TemplateResponse(request, "confirm_fail.html", {"brand_name": BRAND_NAME}, status_code=400)
 
 
 @app.get("/unsubscribe", response_class=HTMLResponse, tags=["Subscribers"])
 def unsubscribe(request: Request, token: str) -> HTMLResponse:
     if unsubscribe_by_token(token):
-        return templates.TemplateResponse("unsubscribe_success.html", {"request": request, "brand_name": BRAND_NAME})
-    return templates.TemplateResponse("unsubscribe_fail.html", {"request": request, "brand_name": BRAND_NAME}, status_code=400)
+        return templates.TemplateResponse(request, "unsubscribe_success.html", {"brand_name": BRAND_NAME})
+    return templates.TemplateResponse(request, "unsubscribe_fail.html", {"brand_name": BRAND_NAME}, status_code=400)
 
 
 # ---------------------------------------------------------------------------
@@ -262,10 +259,8 @@ def track_open(
     subscriber_id: int = Query(default=0),
 ) -> StreamingResponse:
     if subscriber_id:
-        try:
+        with contextlib.suppress(Exception):
             record_analytics_event(newsletter_id, subscriber_id, "open")
-        except Exception:
-            pass
     return StreamingResponse(
         io.BytesIO(_TRACKING_PIXEL),
         media_type="image/png",
@@ -280,10 +275,8 @@ def track_click(
     subscriber_id: int = Query(default=0),
 ) -> RedirectResponse:
     if newsletter_id and subscriber_id:
-        try:
+        with contextlib.suppress(Exception):
             record_analytics_event(newsletter_id, subscriber_id, "click", url=url)
-        except Exception:
-            pass
     return RedirectResponse(url=unquote(url))
 
 
@@ -375,7 +368,7 @@ def health() -> dict[str, str]:
         return {"status": "healthy", "database": "ok"}
     except Exception as exc:
         logger.error("Health check failed: %s", exc)
-        raise HTTPException(status_code=503, detail="Service unhealthy")
+        raise HTTPException(status_code=503, detail="Service unhealthy") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -390,7 +383,7 @@ def admin_dashboard(
     tab: str = Query(default="compose"),
 ) -> HTMLResponse:
     if not _is_admin_logged_in(request):
-        return templates.TemplateResponse("admin_login.html", {"request": request, "error": None, "brand_name": BRAND_NAME})
+        return templates.TemplateResponse(request, "admin_login.html", {"error": None, "brand_name": BRAND_NAME})
 
     all_subscribers, total_subscribers = list_subscribers(search=search, page=page)
     confirmed_count = sum(1 for s in all_subscribers if s["confirmed"])
@@ -408,9 +401,9 @@ def admin_dashboard(
         nl["analytics"] = get_newsletter_analytics(nl["id"])
 
     return templates.TemplateResponse(
+        request,
         "admin_dashboard.html",
         {
-            "request": request,
             "subscribers": all_subscribers,
             "count": total_subscribers,
             "confirmed_count": confirmed_count,
@@ -442,8 +435,9 @@ def admin_login(
 
     if not verify_admin_credentials(username, password):
         return templates.TemplateResponse(
+            request,
             "admin_login.html",
-            {"request": request, "error": "Invalid credentials", "brand_name": BRAND_NAME},
+            {"error": "Invalid credentials", "brand_name": BRAND_NAME},
             status_code=401,
         )
 
@@ -535,9 +529,9 @@ def admin_load_draft(request: Request, draft_id: int) -> HTMLResponse:
         nl["analytics"] = get_newsletter_analytics(nl["id"])
 
     return templates.TemplateResponse(
+        request,
         "admin_dashboard.html",
         {
-            "request": request,
             "subscribers": all_subscribers,
             "count": total_subscribers,
             "confirmed_count": confirmed_count,
@@ -658,9 +652,9 @@ def public_archive(request: Request, page: int = Query(default=1, ge=1)) -> HTML
     newsletters, total = list_newsletters(status_filter="sent", page=page)
     total_pages = max(1, (total + 19) // 20)
     return templates.TemplateResponse(
+        request,
         "archive.html",
         {
-            "request": request,
             "newsletters": newsletters,
             "page": page,
             "total_pages": total_pages,
@@ -675,8 +669,9 @@ def public_archive_detail(request: Request, newsletter_id: int) -> HTMLResponse:
     if not nl or nl["status"] != "sent":
         raise HTTPException(status_code=404, detail="Newsletter not found")
     return templates.TemplateResponse(
+        request,
         "archive_detail.html",
-        {"request": request, "newsletter": nl, "brand_name": BRAND_NAME},
+        {"newsletter": nl, "brand_name": BRAND_NAME},
     )
 
 
@@ -710,4 +705,4 @@ def admin_delete_webhook(request: Request, webhook_id: int) -> RedirectResponse:
 
 @app.get("/embed", response_class=HTMLResponse, tags=["Public"])
 def embed_form(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse("embed.html", {"request": request, "brand_name": BRAND_NAME})
+    return templates.TemplateResponse(request, "embed.html", {"brand_name": BRAND_NAME})
