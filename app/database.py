@@ -379,6 +379,8 @@ def update_newsletter(
     recipient_count: int | None = None,
     sent_at: str | None = None,
 ) -> bool:
+    # Column names are from a hardcoded allowlist — safe from SQL injection.
+    _ALLOWED_COLUMNS = {"subject", "body_text", "body_html", "template", "status", "scheduled_at", "recipient_count", "sent_at"}
     fields: list[str] = []
     values: list[Any] = []
     for col, val in [
@@ -387,6 +389,7 @@ def update_newsletter(
         ("recipient_count", recipient_count), ("sent_at", sent_at),
     ]:
         if val is not None:
+            assert col in _ALLOWED_COLUMNS, f"Invalid column: {col}"
             fields.append(f"{col} = ?")
             values.append(val)
     if not fields:

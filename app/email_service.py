@@ -36,7 +36,7 @@ class EmailService:
         if not self.smtp_host:
             raise RuntimeError("SMTP_HOST is not configured")
 
-        last_error: Exception | None = None
+        last_error: Exception = RuntimeError("SMTP send failed")
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 await aiosmtplib.send(
@@ -60,7 +60,7 @@ class EmailService:
                     await asyncio.sleep(delay)
 
         logger.error("SMTP send failed after %d attempts: %s", MAX_RETRIES, last_error)
-        raise last_error  # type: ignore[misc]
+        raise last_error
 
     async def send_confirmation_email(self, recipient: str, confirm_url: str) -> None:
         html_template = jinja_env.get_template("emails/confirmation.html")

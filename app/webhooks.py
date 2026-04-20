@@ -1,7 +1,10 @@
 """Fire-and-forget webhook notifications for key events."""
 
 import asyncio
+import json
 import logging
+import urllib.error
+import urllib.request
 from typing import Any
 
 from app.database import list_webhooks
@@ -21,10 +24,6 @@ async def fire_webhook(event: str, payload: dict[str, Any]) -> None:
 
 async def _post_webhook(url: str, event: str, payload: dict[str, Any]) -> None:
     """Attempt a POST request to webhook URL using urllib (no extra deps)."""
-    import json
-    import urllib.error
-    import urllib.request
-
     data = json.dumps({"event": event, "data": payload}).encode()
     req = urllib.request.Request(
         url, data=data,
@@ -33,7 +32,7 @@ async def _post_webhook(url: str, event: str, payload: dict[str, Any]) -> None:
     )
     try:
         loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, lambda: urllib.request.urlopen(req, timeout=10))
+        await loop.run_in_executor(None, lambda: urllib.request.urlopen(req, timeout=10))  # noqa: S310
         logger.info("Webhook fired: %s -> %s", event, url)
     except urllib.error.URLError as exc:
         logger.warning("Webhook failed: %s -> %s: %s", event, url, exc)

@@ -1,4 +1,3 @@
-import contextlib
 import csv
 import io
 import logging
@@ -6,10 +5,10 @@ import os
 import re
 import secrets
 import time
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request, status
@@ -21,6 +20,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.auth import check_login_rate_limit, require_admin, verify_admin_credentials
 from app.database import (
+    _now_iso,
     add_subscriber_manual,
     confirm_by_token,
     create_newsletter,
@@ -259,7 +259,7 @@ def track_open(
     subscriber_id: int = Query(default=0),
 ) -> StreamingResponse:
     if subscriber_id:
-        with contextlib.suppress(Exception):
+        with suppress(Exception):
             record_analytics_event(newsletter_id, subscriber_id, "open")
     return StreamingResponse(
         io.BytesIO(_TRACKING_PIXEL),
@@ -275,9 +275,14 @@ def track_click(
     subscriber_id: int = Query(default=0),
 ) -> RedirectResponse:
     if newsletter_id and subscriber_id:
-        with contextlib.suppress(Exception):
+        with suppress(Exception):
             record_analytics_event(newsletter_id, subscriber_id, "click", url=url)
-    return RedirectResponse(url=unquote(url))
+    # Validate URL scheme to prevent open redirect attacks
+    decoded_url = unquote(url)
+    parsed = urlparse(decoded_url)
+    if parsed.scheme not in ("http", "https", ""):
+        raise HTTPException(status_code=400, detail="Invalid URL scheme")
+    return RedirectResponse(url=decoded_url)
 
 
 # ---------------------------------------------------------------------------
@@ -304,7 +309,7 @@ async def send_newsletter_api(
         body_html=payload.body_html,
         newsletter_id=nl_id,
     )
-    update_newsletter(nl_id, recipient_count=sent, sent_at=__import__("app.database", fromlist=["_now_iso"])._now_iso())
+    update_newsletter(nl_id, recipient_count=sent, sent_at=_now_iso())
     await fire_webhook("newsletter.sent", {"newsletter_id": nl_id, "sent": sent})
     return JSONResponse({"sent": sent, "newsletter_id": nl_id})
 
@@ -477,7 +482,6 @@ async def admin_send_newsletter(
             body_html=body_html or None,
             newsletter_id=nl_id,
         )
-        from app.database import _now_iso
         update_newsletter(nl_id, recipient_count=sent, sent_at=_now_iso())
         await fire_webhook("newsletter.sent", {"newsletter_id": nl_id, "sent": sent})
         message = f"Newsletter sent to {sent} subscriber(s)."
