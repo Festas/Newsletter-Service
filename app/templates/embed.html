@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Newsletter Signup</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 1rem; }
+    input, button { padding: .5rem; font-size: 1rem; }
+    #status { margin-top: .75rem; }
+  </style>
+</head>
+<body>
+  <form id="subscribe-form">
+    <label>
+      Email
+      <input type="email" name="email" required>
+    </label>
+    <button type="submit">Subscribe</button>
+  </form>
+  <div id="status"></div>
+
+  <script>
+    const form = document.getElementById('subscribe-form');
+    const statusEl = document.getElementById('status');
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const formData = new FormData(form);
+      const response = await fetch('/subscribe', {
+        method: 'POST',
+        body: formData
+      });
+      const payload = await response.json();
+      statusEl.style.color = response.ok ? 'green' : 'red';
+      statusEl.textContent = payload.message || payload.detail || 'Unknown response';
+    });
+  </script>
+</body>
+</html>
